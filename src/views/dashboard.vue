@@ -148,6 +148,9 @@ export default {
             dateTaskObj.tasks.push(task)
           }
         })
+        dateTaskObj.tasks.sort((m, n) => {
+          return new Date(m.finishDate +' '+ m.finishTime) - new Date(n.finishDate +' '+ n.finishTime);
+        });
         dailyTasks.push(dateTaskObj)
       })
       return dailyTasks
