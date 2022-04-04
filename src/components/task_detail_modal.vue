@@ -20,20 +20,36 @@
                   <p class="name">{{ comment.userName }}</p>
                 </div>
                 <div class="comment-time">
-                  <p
-                  :class="[comment.userId === currentUser.id ? 'mycomment' : 'comment']">
-                  {{ comment.comment }}
-                  </p>
+                  <div :class="[(comment.userId === currentUser.id) ? 'mycomment' : 'comment']">
+                    <p>{{ comment.comment }}</p>
+                    <p
+                    v-if="comment.clipFile"
+                    class="file-name">
+                      <a :href="comment.clipUrl" target="_blank"><i class="far fa-file"></i> {{ comment.clipFile }}</a>
+                    </p>
+                  </div>
                   <p class="posting-time">{{ comment.commentTime }}</p>
                 </div>
               </div>
             </div>
+            <div
+            v-if="clipBox"
+            class="clip-box">
+              <input type="file" name="clip-file" id=""
+              @change="selectFile">
+            </div>
             <div class="modal-textbox clearfix">
-              <input type="text" name="comment" value=""
-              v-model="comment">
-              <div class="share-btn"
-              @click="addComment">
-                <i class="fas fa-share"></i>
+              <textarea name="comment"
+              v-model="comment"></textarea>
+              <div class="buttons">
+                <div :class="[(this.clipBox === true) ? 'clip-btn-active' : 'clip-btn']"
+                @click="switchClipBox">
+                  <p v-html="clipBtnFont"></p>
+                </div>
+                <div class="comment-btn"
+                @click="addComment">
+                  <i class="fas fa-share"></i>
+                </div>
               </div>
             </div>
           </div>
@@ -42,6 +58,13 @@
 </template>
 
 <script>
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL
+  } from "firebase/storage";
+
 import {
   collection,
   addDoc,
@@ -54,7 +77,9 @@ export default {
   data() {
     return {
       comment: '',
-      commentsData: []
+      commentsData: [],
+      clipBox: false,
+      selectedFile: ''
     }
   },
   computed: {
@@ -74,12 +99,14 @@ export default {
 
         members.forEach((member) => {
 
-          if (commentData.userId == member.id) {
+          if (commentData.userId === member.id) {
             const comment = {
               userId: commentData.userId,
               userName: member.name,
               userIcon: member.iconPath,
               comment: commentData.comment,
+              clipFile: commentData.clipFile,
+              clipUrl: commentData.clipUrl,
               timestamp: commentData.timestamp,
               commentTime: commentData.commentTime
             }
@@ -90,60 +117,178 @@ export default {
 
       })
       return comments;
+    },
+    clipBtnFont() {
+      let clipBtnFont = '';
+      if(this.clipBox === true) {
+        clipBtnFont = '<i class="fas fa-times"></i>'
+      } else if (this.clipBox === false) {
+        clipBtnFont = '<i class="fas fa-paperclip"></i>'
+      }
+      return clipBtnFont;
     }
   },
   methods: {
-    addComment() {
-      const newComment = {
-        userId: this.currentUser.id,
-        comment: this.comment,
-        timestamp: new Date(),
+    switchClipBox() {
+      if(this.clipBox === false) {
+        this.clipBox = true;
+      } else if(this.clipBox === true) {
+        this.clipBox = false;
       }
+    },
+    selectFile(event) {
+      this.selectedFile = event.target.files[0];
+    },
 
-      addDoc(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'), newComment)
-      .then(() => {
-          getDocs(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'))
-          .then((querySnapshot) => {
-              const commentsData = []
-              querySnapshot.forEach((doc) => {
+    addComment() {
+      if(this.comment !== '' ){
 
-                const time = new Date( doc.data().timestamp.seconds * 1000);
-                const month = time.getMonth() + 1;
-                const day = time.getDate();
-                const hour = time.getHours();
-                const min = time.getMinutes();
-                const commentTime = month + '月' + day + '日' + ' ' + hour + ':' + min;
+        if(this.selectedFile !== '') {
 
-                console.log(time);
-                console.log(doc.data().timestamp.seconds);
+          const storage = getStorage();
+          const fileName = this.selectedFile.name;
+          const storageRef = ref(storage, "clip-files/" +  fileName + Date.now());
+          const uploadTask = uploadBytesResumable(storageRef, this.selectedFile);
 
-                const commentData = {
-                  id: doc.id,
-                  userId: doc.data().userId,
-                  comment: doc.data().comment,
-                  timestamp: doc.data().timestamp.seconds,
-                  commentTime: commentTime
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              console.log('Upload is ' + progress + '% done');
+              switch (snapshot.state) {
+                case 'paused':
+                  console.log('Upload is paused');
+                  break;
+                case 'running':
+                  console.log('Upload is running');
+                  break;
+              }
+            },
+            (error) => {
+              switch (error.code) {
+                case 'storage/unauthorized':
+                  break;
+                case 'storage/canceled':
+                  break;
+                case 'storage/unknown':
+                  break;
+              }
+            },
+            () => {
+              getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+
+                const newComment = {
+                  userId: this.currentUser.id,
+                  comment: this.comment,
+                  clipFile: this.selectedFile.name,
+                  clipUrl: downloadURL,
+                  timestamp: new Date(),
                 }
-                commentsData.push(commentData)
-              })
 
-              commentsData.sort((m, n) => {
-                return m.timestamp - n.timestamp;
+                addDoc(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'), newComment)
+                .then(() => {
+                    getDocs(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'))
+                    .then((querySnapshot) => {
+                        const commentsData = []
+                        querySnapshot.forEach((doc) => {
+
+                          const time = new Date( doc.data().timestamp.seconds * 1000);
+                          const month = time.getMonth() + 1;
+                          const day = time.getDate();
+                          const hour = time.getHours();
+                          const min = time.getMinutes();
+                          const commentTime = month + '月' + day + '日' + ' ' + [(hour >= 10) ? hour : '0' + hour] + ':' + [(min >= 10) ? min : '0' + min];
+
+                          const commentData = {
+                            id: doc.id,
+                            userId: doc.data().userId,
+                            comment: doc.data().comment,
+                            clipFile: doc.data().clipFile,
+                            clipUrl: doc.data().clipUrl,
+                            timestamp: doc.data().timestamp.seconds,
+                            commentTime: commentTime
+                          }
+                          commentsData.push(commentData)
+                        })
+
+                        commentsData.sort((m, n) => {
+                          return m.timestamp - n.timestamp;
+                        });
+
+                        this.commentsData = commentsData;
+                        this.comment = '';
+                        this.selectedFile = '';
+                        this.clipBox = false;
+                      }
+                    )
+                    .catch(() => {
+                      console.log('データ取得失敗');
+                    })
+                  }
+                )
+                .catch(() => {
+                  console.log('store失敗')
+                })
+
               });
+            }
+          );
 
-              this.commentsData = commentsData;
+
+        } else {
+          const newComment = {
+            userId: this.currentUser.id,
+            comment: this.comment,
+            timestamp: new Date(),
+          }
+
+          addDoc(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'), newComment)
+          .then(() => {
+              getDocs(collection(getFirestore(), 'projects', this.currentProject.id, 'tasks', this.currentTask.id, 'comments'))
+              .then((querySnapshot) => {
+                  const commentsData = []
+                  querySnapshot.forEach((doc) => {
+
+                    const time = new Date( doc.data().timestamp.seconds * 1000);
+                    const month = time.getMonth() + 1;
+                    const day = time.getDate();
+                    const hour = time.getHours();
+                    const min = time.getMinutes();
+                    const commentTime = month + '月' + day + '日' + ' ' + [(hour >= 10) ? hour : '0' + hour] + ':' + [(min >= 10) ? min : '0' + min];
+
+                    const commentData = {
+                      id: doc.id,
+                      userId: doc.data().userId,
+                      comment: doc.data().comment,
+                      clipFile: doc.data().clipFile,
+                      clipUrl: doc.data().clipUrl,
+                      timestamp: doc.data().timestamp.seconds,
+                      commentTime: commentTime
+                    }
+                    commentsData.push(commentData)
+                  })
+
+                  commentsData.sort((m, n) => {
+                    return m.timestamp - n.timestamp;
+                  });
+
+                  this.commentsData = commentsData;
+                  this.comment = '';
+                }
+              )
+              .catch(() => {
+                console.log('データ取得失敗');
+              })
             }
           )
           .catch(() => {
-            console.log('データ取得失敗');
+            console.log('store失敗')
           })
-        }
-      )
-      .catch(() => {
-        console.log('store失敗')
-      })
 
-      this.comment = '';
+        }
+
+
+      }
+
     },
     closeModal() {
       const currentTask = {
@@ -169,12 +314,14 @@ export default {
           const day = time.getDate();
           const hour = time.getHours();
           const min = time.getMinutes();
-          const commentTime = month + '月' + day + '日' + ' ' + hour + ':' + min;
+          const commentTime = month + '月' + day + '日' + ' ' + [(hour >= 10) ? hour : '0' + hour] + ':' + [(min >= 10) ? min : '0' + min];
 
           const commentData = {
             id: doc.id,
             userId: doc.data().userId,
             comment: doc.data().comment,
+            clipFile: doc.data().clipFile,
+            clipUrl: doc.data().clipUrl,
             timestamp: doc.data().timestamp.seconds,
             commentTime: commentTime
           }
@@ -269,6 +416,7 @@ export default {
         border-radius: 3px;
         padding: 10px;
         overflow-y: scroll;
+        margin-bottom: 5px;
 
         &::-webkit-scrollbar  {
           overflow:hidden;
@@ -329,18 +477,28 @@ export default {
             width: 420px;
             margin-left: 10px;
 
-            p.comment {
+            div.comment {
               padding: 5px;
               font-size: 0.8em;
               border-radius: 5px;
               background-color: #deffff;
             }
 
-            p.mycomment {
+            div.mycomment {
               padding: 5px;
               font-size: 0.8em;
               border-radius: 5px;
               background-color:#ffeddb;
+            }
+
+            p.file-name {
+              margin-top: 5px;
+              font-weight: bold;
+              border: solid 1px #b5b5b5;
+              border-radius: 5px;
+              padding: 5px;
+              width:-moz-fit-content; 
+              width:fit-content; 
             }
 
             p.posting-time {
@@ -369,40 +527,91 @@ export default {
       }
 
       div.modal-textbox {
-        margin-top: 5px;
         text-align: left;
         width: 100%;
 
-        input {
+        textarea {
           font-size: 0.8em;
-          padding: 1px 0;
+          padding: 2px;
           color: #333333;
           border: 1px #333333 solid;
           line-height: 1.5em;
-          border-radius: 3px 0 0 3px;
+          border-radius: 3px 3px 0 3px;
+          resize: none;
           width: 90%;
+          height: 70px;
           display: block;
           float: left;
         }
 
-        div.share-btn {
-          line-height: 1.5em;
-          padding: 2px;
-          border-radius: 0 3px 3px 0;
-          font-size: 0.8em;
-          color: #fff;
-          background-color: #444444;
-          text-align: center;
+        div.buttons {
           float: left;
           width: 10%;
 
-          &:hover {
-            opacity: 0.7;
-            cursor: pointer;
+          div.clip-btn {
+            width: 90%;
+            margin: 2px auto;
+            line-height: 38px;
+            padding: 2px;
+            border-radius: 0 3px 3px 0;
+            font-size: 1em;
+            color: #333333;
+            background-color: #d4d4d4;
+            text-align: center;
+            border-radius:  50%;
+
+            &:hover {
+              opacity: 0.7;
+              cursor: pointer;
+            }
+
+          }
+
+          div.clip-btn-active {
+            width: 100%;
+            margin: 0 auto 4px auto;
+            line-height: 38px;
+            padding: 2px;
+            border-radius: 0 3px 3px 0;
+            font-size: 1em;
+            color: #333333;
+            background-color: #d4d4d4;
+            text-align: center;
+            border-radius: 0 0 50% 50%;
+
+            &:hover {
+              opacity: 0.7;
+              cursor: pointer;
+            }
+
+          }
+
+          div.comment-btn {
+            line-height: 20px;
+            padding: 2px;
+            border-radius: 0 3px 3px 0;
+            font-size: 0.8em;
+            color: #fff;
+            background-color: #444444;
+            text-align: center;
+
+            &:hover {
+              opacity: 0.7;
+              cursor: pointer;
+            }
+
           }
 
         }
 
+
+      }
+
+      div.clip-box {
+        background-color: #d4d4d4;
+        font-size: 0.8em;
+        padding: 8px 4px;
+        border-radius: 3px 3px 0 0;
       }
 
       p.mt5 {

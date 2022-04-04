@@ -19,9 +19,19 @@
             <p class="modal-text">終了日時</p>
             <p v-if="showFinishDateError" class="error-messages">終了日時を登録してください</p>
             <p class="modal-textbox">
-              <input type="date" name="finishDate" value=""
-              v-model="finishDate"
-              @focus="hideFinishDateError">
+
+              <select
+              name="finishDate"
+              id="finishDate"
+              v-model="finishDate">
+                <option :value="null" disabled>--選択してください--</option>
+                <option
+                v-for="(theDay, i) in projectPeriod"
+                :key="theDay.date+i"
+                :value="theDay.japaneseDate"
+                @focus="hideFinishDateError">{{ theDay.japaneseDate }}</option>
+              </select>
+
             </p>
             <p class="modal-textbox mt5">
               <input type="time" name="finishTime" value=""
@@ -62,7 +72,7 @@ export default {
     return {
       taskName: '',
       taskOutline: '',
-      finishDate: '',
+      finishDate: null,
       finishTime: '',
       taskLeader: null,
       showTaskNameError: false,
@@ -75,23 +85,46 @@ export default {
     },
     taskList() {
       return this.$store.getters.taskList;
-    }
+    },
+    projectPeriod() {
+      const currentProject = this.$store.getters.currentProject;
+      const startDate = new Date(currentProject.startDate);
+      const finishDate = new Date(currentProject.finishDate);
+      const projectPeriod = [];
+      let theDay = startDate;
+      while( theDay <= finishDate ) {
+        const dateObj = {
+          date: theDay.getFullYear() + '-' + [((theDay.getMonth() + 1) >= 10) ?(theDay.getMonth() + 1) : '0' + (theDay.getMonth() + 1)] + '-' + [((theDay.getDate()) >= 10) ?(theDay.getDate()) : '0' + (theDay.getDate())],
+          japaneseDate: (theDay.getMonth() + 1) + '月' + theDay.getDate() + '日'
+        };
+        projectPeriod.push(dateObj);
+        theDay = new Date(theDay.setDate(theDay.getDate() + 1))
+      }
+      return projectPeriod;
+    },
   },
   methods: {
     createNewTask() {
-      if (this.taskName == '' && this.finishDate == '') {
+      if (this.taskName === '' && this.finishDate === '') {
         this.showTaskNameError = true;
         this.showFinishDateError = true;
-      } else if (this.taskName == '') {
+      } else if (this.taskName === '') {
         this.showTaskNameError = true;
-      } else if (this.finishDate == '') {
+      } else if (this.finishDate ===   '') {
         this.showFinishDateError = true;
       } else {
+
+        let finishDay = '';
+        this.projectPeriod.forEach((dateObj) => {
+          if(dateObj.japaneseDate === this.finishDate) {
+            finishDay = dateObj.date;
+          }
+        })
 
         const newTask = {
           taskName: this.taskName,
           taskOutline: this.taskOutline,
-          finishDate: this.finishDate,
+          finishDate: finishDay,
           finishTime: this.finishTime,
           taskLeader: this.taskLeader,
         };
