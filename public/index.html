@@ -6,6 +6,27 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <link rel="icon" href="<%= BASE_URL %>favicon.ico">
     <title><%= htmlWebpackPlugin.options.title %></title>
+
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+      // TODO: Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCPTauWV6svIKWFLTscYKjCZRHUe4JJs3Y",
+        authDomain: "my-portfolio-c7f24.firebaseapp.com",
+        projectId: "my-portfolio-c7f24",
+        storageBucket: "my-portfolio-c7f24.appspot.com",
+        messagingSenderId: "250433775902",
+        appId: "1:250433775902:web:9a254be6156f3923ae410f"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+    </script>
+
   </head>
   <body>
     <noscript>

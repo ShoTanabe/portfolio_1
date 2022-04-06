@@ -89,9 +89,15 @@ export default {
     projectPeriod() {
       const currentProject = this.$store.getters.currentProject;
       const startDate = new Date(currentProject.startDate);
+      const today = new Date();
       const finishDate = new Date(currentProject.finishDate);
       const projectPeriod = [];
       let theDay = startDate;
+
+      if(startDate < today) {
+        theDay = today;
+      }
+
       while( theDay <= finishDate ) {
         const dateObj = {
           date: theDay.getFullYear() + '-' + [((theDay.getMonth() + 1) >= 10) ?(theDay.getMonth() + 1) : '0' + (theDay.getMonth() + 1)] + '-' + [((theDay.getDate()) >= 10) ?(theDay.getDate()) : '0' + (theDay.getDate())],

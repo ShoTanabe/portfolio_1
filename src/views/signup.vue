@@ -88,6 +88,7 @@ export default {
             this.name = '';
             this.address = '';
             this.password = '';
+            this.$router.push('/');
             }
           )
           .catch(() => {

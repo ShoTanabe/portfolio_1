@@ -11,9 +11,9 @@
         <SwitchBtn
           @changeSortType="changeSortType"></SwitchBtn>
       </div>
-      <div class="search-area">
+      <!-- <div class="search-area">
         <SearchBox></SearchBox>
-      </div>
+      </div> -->
     </div>
     <div>
       <h2>タスク一覧</h2>
@@ -85,7 +85,7 @@
 import HomeHeader from '@/components/home_header.vue'
 import ProjectHeader from '@/components/project_header.vue'
 import SwitchBtn from '@/components/switch_btn.vue'
-import SearchBox from '@/components/search_box.vue'
+// import SearchBox from '@/components/search_box.vue'
 import MakingTaskModal from '@/components/making_task_modal.vue'
 import EditingUserDataModal from '@/components/editing_userdata_modal.vue'
 import TaskDetailModal from '@/components/task_detail_modal.vue'
@@ -102,7 +102,7 @@ export default {
     HomeHeader,
     ProjectHeader,
     SwitchBtn,
-    SearchBox,
+    // SearchBox,
     MakingTaskModal,
     EditingUserDataModal,
     TaskDetailModal
